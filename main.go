@@ -3,27 +3,29 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/joho/godotenv"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/joho/godotenv"
-	_ "github.com/mattn/go-sqlite3"
+	"time"
 )
 
 type User struct {
-	ID    int64  `json:"id"`
-	Name  string `json:"name"`
-	Team  string `json:"team"`
-	Phone string `json:"phone"`
-	Email string `json:"email"`
-	Step  int    `json:"step"`
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Team     string `json:"team"`
+	Phone    string `json:"phone"`
+	Email    string `json:"email"`
+	Step     int    `json:"step"`
+	Username string `json:"username"`
+	Time     string `json:"time"`
 }
 
 func (p *User) ToString() string {
-	return "ID-" + fmt.Sprint(p.ID) + ": \nФИО - " + p.Name + "\nКоманда - " + p.Team + "\nТелефон - " + p.Phone + "\n Почта - " + p.Email + "\n"
+	return "ID-" + fmt.Sprint(p.ID) + ": \nФИО - " + p.Name + "\nКоманда - " + p.Team + "\nТелефон - " + p.Phone + "\n Почта - " + p.Email + "\n Username - " + p.Username + "\n Время - " + p.Time + "\n"
 }
 
 var bot *tgbotapi.BotAPI
@@ -33,10 +35,10 @@ var userData = make(map[int64]*User)
 
 func saveUser(user User) error {
 	query := `
-    INSERT OR IGNORE INTO users (id, name, team, phone, email)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO users (id, name, team, phone, email, username, time)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     `
-	_, err := db.Exec(query, user.ID, user.Name, user.Team, user.Phone, user.Email)
+	_, err := db.Exec(query, user.ID, user.Name, user.Team, user.Phone, user.Email, user.Username, user.Time)
 	return err
 }
 
@@ -93,14 +95,14 @@ func main() {
 
 func getUserByID(id int64) (*User, error) {
 	query := `
-    SELECT id, name, team, phone, email
+    SELECT id, name, team, phone, email, username, time
     FROM users
     WHERE id=?
     `
 	row := db.QueryRow(query, id)
 
 	var u User
-	err := row.Scan(&u.ID, &u.Name, &u.Team, &u.Phone, &u.Email)
+	err := row.Scan(&u.ID, &u.Name, &u.Team, &u.Phone, &u.Email, &u.Username, &u.Time)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +126,7 @@ func handleMessage(message *tgbotapi.Message) {
 			return
 		}
 
-		user = &User{ID: message.From.ID}
+		user = &User{ID: message.From.ID, Username: "@" + message.From.UserName, Time: time.Now().Format("2006-01-02 15:04:05")}
 		msg := tgbotapi.NewMessage(message.Chat.ID, "Введите ваше ФИО")
 		bot.Send(msg)
 
@@ -158,14 +160,19 @@ func handleMessage(message *tgbotapi.Message) {
 				bot.Send(msg)
 			} else {
 				log.Print("User ", user.ID, " was registered!")
-				msg := tgbotapi.NewMessage(message.Chat.ID, "Вы успешно зарегистрированы! Список всех участников можно увидеть с помощью команды /list")
+				msg := tgbotapi.NewMessage(message.Chat.ID, "Регистрация прошла успешно! Об участии с Вами свяжется Morozov.")
 				bot.Send(msg)
 			}
 			delete(userData, message.From.ID)
 			return
 		}
 	} else if message.Text == "/list" {
-		rows, err := db.Query("SELECT id, name, team, phone, email FROM users")
+		if !isAdmin(message.From.ID) {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Недостаточно прав для просмотра списка участников")
+			bot.Send(msg)
+			return
+		}
+		rows, err := db.Query("SELECT id, name, team, phone, email, username, time FROM users")
 		if err != nil {
 			log.Printf("Error querying users: %v", err)
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Возникла ошибка при загрузке списка участников, мы уже работаем над вопросом!")
@@ -175,11 +182,11 @@ func handleMessage(message *tgbotapi.Message) {
 		defer rows.Close()
 
 		var participants []string
-		participants = append(participants, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+		participants = append(participants, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
 		for rows.Next() {
 			var p User
-			err := rows.Scan(&p.ID, &p.Name, &p.Team, &p.Phone, &p.Email)
+			err := rows.Scan(&p.ID, &p.Name, &p.Team, &p.Phone, &p.Email, &p.Username, &p.Time)
 			if err != nil {
 				log.Printf("Error scanning user: %v", err)
 				continue
@@ -190,7 +197,7 @@ func handleMessage(message *tgbotapi.Message) {
 		if len(participants) == 1 {
 			participants = append(participants, "Пока-что здесь пусто")
 		}
-		participants = append(participants, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+		participants = append(participants, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
 		msg := tgbotapi.NewMessage(message.Chat.ID, "Список участников:")
 		msg.Text += "\n" + strings.Join(participants, "\n")
@@ -237,7 +244,7 @@ func handleMessage(message *tgbotapi.Message) {
 		bot.Send(msg)
 		return
 	} else {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "Неизвестная команда, допустимые команды: /list и /start")
+		msg := tgbotapi.NewMessage(message.Chat.ID, "Неизвестная команда")
 		bot.Send(msg)
 	}
 }
