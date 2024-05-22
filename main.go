@@ -172,7 +172,8 @@ func handleMessage(message *tgbotapi.Message) {
 			bot.Send(msg)
 			return
 		}
-		rows, err := db.Query("SELECT id, name, team, phone, email, username, time FROM users")
+
+		rows, err := db.Query("SELECT id, name, team, phone, email, username, time FROM users ORDER BY time ASC")
 		if err != nil {
 			log.Printf("Error querying users: %v", err)
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Возникла ошибка при загрузке списка участников, мы уже работаем над вопросом!")
@@ -199,9 +200,42 @@ func handleMessage(message *tgbotapi.Message) {
 		}
 		participants = append(participants, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
-		msg := tgbotapi.NewMessage(message.Chat.ID, "Список участников:")
-		msg.Text += "\n" + strings.Join(participants, "\n")
-		bot.Send(msg)
+		// Create a temporary file
+		tempFile, err := os.Create("participants.txt")
+		if err != nil {
+			log.Printf("Error creating temporary file: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Возникла ошибка при создании списка участников, мы уже работаем над вопросом!")
+			bot.Send(msg)
+			return
+		}
+		defer tempFile.Close()
+
+		// Write the participants' information to the file
+		_, err = tempFile.WriteString(strings.Join(participants, "\n"))
+		if err != nil {
+			log.Printf("Error writing to temporary file: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Возникла ошибка при создании списка участников, мы уже работаем над вопросом!")
+			bot.Send(msg)
+			return
+		}
+		Z := tgbotapi.FilePath("participants.txt")
+		// Send the file to the user
+		fileSend := tgbotapi.RequestFile{
+			Name: "participants.txt",
+			Data: Z,
+		}
+		document := tgbotapi.NewDocument(message.Chat.ID, fileSend.Data)
+		_, err = bot.Send(document)
+		if err != nil {
+			log.Printf("Error sending document: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Возникла ошибка при отправке списка участников, мы уже работаем над вопросом!")
+			bot.Send(msg)
+			return
+		}
+		err = os.Remove("participants.txt")
+		if err != nil {
+			log.Fatalf("Failed to remove temp file: %s", err)
+		}
 		return
 	} else if len(message.Text) > 5 && message.Text[:5] == "/del_" {
 		id, err := strconv.ParseInt(message.Text[5:], 10, 64)
@@ -243,6 +277,22 @@ func handleMessage(message *tgbotapi.Message) {
 		msg := tgbotapi.NewMessage(message.Chat.ID, "Участник успешно удален")
 		bot.Send(msg)
 		return
+	} else if message.Text == "/deleteall" {
+		if !isAdmin(message.From.ID) {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Недостаточно прав для удаления участника")
+			bot.Send(msg)
+			return
+		}
+
+		_, err := db.Exec("DELETE FROM users")
+		if err != nil {
+			log.Printf("Error dropping db: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Ошибка при удалении БД")
+			bot.Send(msg)
+			return
+		}
+		msg := tgbotapi.NewMessage(message.Chat.ID, "База данных была очищена")
+		bot.Send(msg)
 	} else {
 		msg := tgbotapi.NewMessage(message.Chat.ID, "Неизвестная команда")
 		bot.Send(msg)
