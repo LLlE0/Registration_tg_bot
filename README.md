@@ -1,6 +1,6 @@
 # Registration_tg_bot
 
-Free to use bot to provide easy registration on your events.
+Free to use bot to provide easy registration on your events. ⭐pls
 
 It is cross-platform, so you may can run it on any OS you want.
 
@@ -36,4 +36,24 @@ BOT_TOKEN=<your_bot_token>
 
 ADMIN_IDS=11111111,11111112,<etc>
 
-⭐pls
+
+<h1>LIST OF COMMANDS👾️</h1>
+
+```/start```
+
+- initiate registration
+
+```/list``` 
+
+- root only, get the list of users
+
+```/del_{user_id}```
+
+- root only, delete the user with ID == {user_id}
+
+```/deleteall```
+
+- root only, flush the table of users
+
+
+
