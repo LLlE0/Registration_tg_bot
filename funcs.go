@@ -49,7 +49,7 @@ func IsBanned(message *tgbotapi.Message) bool {
 // ---------------------Handlers--------------------------//
 
 /*
-Function initiates the process of registration. It begins the dialogue with user which lasts for 4 messages.
+Function initiates the process of registration. It begins the dialogue with user which lasts for 5 messages.
 Then it inserts user into the DB.
 Feel free to change the dialogues here
 */
@@ -91,12 +91,17 @@ func StartRegistration(message *tgbotapi.Message) {
 			user.Step++
 		case 2:
 			user.Team = message.Text
-			msg := tgbotapi.NewMessage(message.Chat.ID, "One message to go! Input your email, please: ")
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Nice! Now, write the list of your teammates names (all in one message):")
 			Bot.Send(msg)
 			user.Step++
 		case 3:
+			user.Team = message.Text
+			msg := tgbotapi.NewMessage(message.Chat.ID, "One message to go! Input your email, please: ")
+			Bot.Send(msg)
+			user.Step++
+		case 4:
 			user.Email = message.Text
-			err := SaveUser(*user)
+			err := saveUser(*user)
 			if err != nil {
 				log.Printf("Error saving user: %v", err)
 				msg := tgbotapi.NewMessage(message.Chat.ID, "Error occured while inserting you into the database! Perhaps, you inserted some invalid data. Please, consider your data is correct or try again later. If it does not help, you may contact admins of the event.")

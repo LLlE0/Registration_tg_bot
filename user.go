@@ -6,14 +6,15 @@ import (
 )
 
 type User struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	Team     string `json:"team"`
-	Phone    string `json:"phone"`
-	Email    string `json:"email"`
-	Step     int    `json:"step"`
-	Username string `json:"username"`
-	Time     string `json:"time"`
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Team        string `json:"team"`
+	Phone       string `json:"phone"`
+	Email       string `json:"email"`
+	Step        int    `json:"step"`
+	Username    string `json:"username"`
+	Time        string `json:"time"`
+	TeamMembers string `json:"team_members"`
 }
 
 func (p *User) ToString() string {
@@ -23,15 +24,15 @@ func (p *User) ToString() string {
 	if banned == 0 {
 		envelope = "no"
 	}
-	return "ID - " + fmt.Sprint(p.ID) + "\nName - " + p.Name + "\nTeam - " + p.Team + "\nPhone - " + p.Phone + "\nEmail - " + p.Email + "\nUsername - " + p.Username + "\nTime - " + p.Time + "\nIs banned? " + envelope + "\n"
+	return "ID - " + fmt.Sprint(p.ID) + "\nName - " + p.Name + "\nTeam - " + p.Team + "\nPhone - " + p.Phone + "\nEmail - " + p.Email + "\nSquad - " + p.TeamMembers + "\nUsername - " + p.Username + "\nTime - " + p.Time + "\nIs banned? " + envelope + "\n"
 }
 
-func SaveUser(user User) error {
+func saveUser(user User) error {
 	query := `
-    INSERT INTO users (id, name, team, phone, email, username, time)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    `
-	_, err := Db.Exec(query, user.ID, user.Name, user.Team, user.Phone, user.Email, user.Username, user.Time)
+        INSERT OR IGNORE INTO users (id, name, team, phone, email, username, time, team_members)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `
+	_, err := Db.Exec(query, user.ID, user.Name, user.Team, user.Phone, user.Email, user.Username, user.Time, user.TeamMembers)
 	return err
 }
 
@@ -42,14 +43,14 @@ func DeleteUser(id string) (sql.Result, error) {
 
 func getUserByID(id int64) (*User, error) {
 	query := `
-    SELECT id, name, team, phone, email, username, time
+    SELECT id, name, team, phone, email, username, time, team_members
     FROM users
     WHERE id=?
     `
 	row := Db.QueryRow(query, id)
 
 	var u User
-	err := row.Scan(&u.ID, &u.Name, &u.Team, &u.Phone, &u.Email, &u.Username, &u.Time)
+	err := row.Scan(&u.ID, &u.Name, &u.Team, &u.Phone, &u.Email, &u.Username, &u.Time, &u.TeamMembers)
 	if err != nil {
 		return nil, err
 	}
